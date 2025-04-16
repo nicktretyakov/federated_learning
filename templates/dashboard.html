@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Federated Learning Dashboard</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+                color: #333;
+            }
+            h1,
+            h2 {
+                color: #2c3e50;
+            }
+            .container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+            .card {
+                background: #f9f9f9;
+                border-radius: 5px;
+                padding: 20px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                flex: 1;
+                min-width: 300px;
+            }
+            .status {
+                padding: 5px 10px;
+                border-radius: 4px;
+                display: inline-block;
+                font-weight: bold;
+            }
+            .status.active {
+                background-color: #e1f5e1;
+                color: #2e7d32;
+            }
+            .status.inactive {
+                background-color: #ffebee;
+                color: #c62828;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+            }
+            table,
+            th,
+            td {
+                border: 1px solid #ddd;
+            }
+            th,
+            td {
+                padding: 12px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            button {
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 14px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 4px;
+            }
+            button:hover {
+                background-color: #45a049;
+            }
+            pre {
+                background-color: #f5f5f5;
+                padding: 10px;
+                border-radius: 4px;
+                overflow-x: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Federated Learning Dashboard</h1>
+
+        <div class="container">
+            <div class="card">
+                <h2>Server Status</h2>
+                <div id="serverStatus">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h2>Connected Nodes</h2>
+                <div id="connectedNodes">Loading...</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px">
+            <h2>System Overview</h2>
+            <p>
+                This federated learning system implements the following
+                components:
+            </p>
+            <ul>
+                <li>
+                    <strong>Central Server:</strong> Aggregates model parameters
+                    from nodes
+                </li>
+                <li>
+                    <strong>Node Actors:</strong> Train models on local data and
+                    send updates to server
+                </li>
+                <li>
+                    <strong>FedAvg Algorithm:</strong> Averages parameters from
+                    multiple nodes
+                </li>
+                <li>
+                    <strong>Asynchronous Communication:</strong> Using Actix
+                    actor system
+                </li>
+            </ul>
+        </div>
+
+        <div class="card" style="margin-top: 20px">
+            <h2>Model Parameters</h2>
+            <p>The neural network model consists of:</p>
+            <ul>
+                <li>Input layer: 10 features</li>
+                <li>Hidden layer: 64 neurons with ReLU activation</li>
+                <li>Output layer: 1 neuron (regression)</li>
+            </ul>
+            <div id="modelParams">
+                <p>Parameter count: <span id="paramCount">Loading...</span></p>
+                <button id="toggleParams" onclick="toggleParamView()">
+                    Show Parameters
+                </button>
+                <pre id="parameterJson" style="display: none">Loading...</pre>
+            </div>
+        </div>
+
+        <script>
+            // Fetch model parameters
+            async function fetchModelParams() {
+                try {
+                    const response = await fetch("/api/model/params");
+                    const data = await response.json();
+
+                    if (data.status === "success") {
+                        document.getElementById("paramCount").textContent =
+                            data.size;
+                        document.getElementById("parameterJson").textContent =
+                            JSON.stringify(data.parameters, null, 2).substring(
+                                0,
+                                5000,
+                            ) +
+                            (data.parameters.length > 5000
+                                ? "\n... (truncated)"
+                                : "");
+                    } else {
+                        document.getElementById("paramCount").textContent =
+                            "Error loading parameters";
+                        document.getElementById("parameterJson").textContent =
+                            JSON.stringify(data, null, 2);
+                    }
+                } catch (error) {
+                    document.getElementById("paramCount").textContent =
+                        "Error loading parameters";
+                    document.getElementById("parameterJson").textContent =
+                        "Error: " + error.message;
+                }
+            }
+
+            function toggleParamView() {
+                const paramView = document.getElementById("parameterJson");
+                const toggleBtn = document.getElementById("toggleParams");
+
+                if (paramView.style.display === "none") {
+                    paramView.style.display = "block";
+                    toggleBtn.textContent = "Hide Parameters";
+                } else {
+                    paramView.style.display = "none";
+                    toggleBtn.textContent = "Show Parameters";
+                }
+            }
+
+            // Initial fetch of model parameters
+            fetchModelParams();
+
+            // Update every 10 seconds
+            setInterval(fetchModelParams, 10000);
+        </script>
+
+        <script>
+            // Fetch server status
+            async function fetchServerStatus() {
+                try {
+                    const response = await fetch("/status");
+                    const data = await response.json();
+
+                    const statusHTML = `
+                    <p><span class="status active">${data.status}</span></p>
+                    <p>${data.message}</p>
+                `;
+
+                    document.getElementById("serverStatus").innerHTML =
+                        statusHTML;
+                } catch (error) {
+                    document.getElementById("serverStatus").innerHTML = `
+                    <p><span class="status inactive">Offline</span></p>
+                    <p>Error: Could not connect to server</p>
+                `;
+                }
+            }
+
+            // Fetch connected nodes
+            async function fetchNodes() {
+                try {
+                    const response = await fetch("/api/nodes");
+                    const nodes = await response.json();
+
+                    if (nodes.length === 0) {
+                        document.getElementById("connectedNodes").innerHTML =
+                            "<p>No nodes connected yet</p>";
+                        return;
+                    }
+
+                    let tableHTML = `
+                    <table>
+                        <tr>
+                            <th>Node Address</th>
+                            <th>Status</th>
+                        </tr>
+                `;
+
+                    for (const node of nodes) {
+                        tableHTML += `
+                        <tr>
+                            <td>${node.address}</td>
+                            <td><span class="status active">${node.status}</span></td>
+                        </tr>
+                    `;
+                    }
+
+                    tableHTML += "</table>";
+                    document.getElementById("connectedNodes").innerHTML =
+                        tableHTML;
+                } catch (error) {
+                    document.getElementById("connectedNodes").innerHTML =
+                        "<p>Error fetching nodes</p>";
+                }
+            }
+
+            // Initial fetches
+            fetchServerStatus();
+            fetchNodes();
+
+            // Update every 5 seconds
+            setInterval(() => {
+                fetchServerStatus();
+                fetchNodes();
+            }, 5000);
+        </script>
+    </body>
+</html>
